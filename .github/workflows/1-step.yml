@@ -1,0 +1,59 @@
+name: Step 1
+
+on:
+  push:
+    paths:
+      - 'src/validateEmail.ts'
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+jobs:
+  exercise_checking:
+    name: Start checking
+    uses: ./.github/workflows/exercise-checking.yml
+
+  test_converter:
+    name: Test Converter Script
+    runs-on: ubuntu-latest
+    needs: exercise_checking
+    if: needs.exercise_checking.outputs.comment-id != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+  exercise_passed:
+    name: Exercise passed
+    needs: [exercise_checking, test_converter]
+    if: needs.test_converter.result == 'success'
+    uses: ./.github/workflows/exercise-passed.yml
+    with:
+      module-title: "Intro & Basics"
+      issue-url: ${{ needs.exercise_checking.outputs.issue-url }}
+      issue-number: ${{ needs.exercise_checking.outputs.issue-number }}
+      comment-id: ${{ needs.exercise_checking.outputs.comment-id }}
+
+  exercise_failed:
+    name: Exercise failed
+    needs: [exercise_checking, test_converter]
+    if: always() && needs.test_converter.result == 'failure'
+    uses: ./.github/workflows/exercise-failed.yml
+    with:
+      comment-id: ${{ needs.exercise_checking.outputs.comment-id }}
+      feedback-message: "The tests failed. Please check your implementation of the `validateEmail` function in `src/validateEmail.ts` and try again."
